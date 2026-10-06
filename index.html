@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heat Scene Editor</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #111;
+            color: #ddd;
+            font-family: Consolas, monospace;
+            font-size: 14px;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        #sidebar {
+            width: 300px;
+            padding: 18px;
+            background: #181818;
+            border-right: 1px solid #333;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        h1 {
+            font-size: 18px;
+            margin: 0 0 18px;
+            color: #fff;
+        }
+
+        h2 {
+            font-size: 14px;
+            margin: 20px 0 10px;
+            color: #aaa;
+            text-transform: uppercase;
+        }
+
+        .section {
+            border-bottom: 1px solid #333;
+            padding-bottom: 15px;
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+        }
+
+        input,
+        select,
+        button {
+            font-family: inherit;
+            font-size: 13px;
+        }
+
+        input[type="number"],
+        input[type="text"] {
+            width: 100%;
+            background: #222;
+            color: #ddd;
+            border: 1px solid #444;
+            padding: 7px;
+            border-radius: 3px;
+        }
+
+        input[type="number"]:focus,
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #777;
+        }
+
+        input[type="range"] {
+            width: 100%;
+        }
+
+        input[type="color"] {
+            width: 100%;
+            height: 32px;
+            background: #222;
+            border: 1px solid #444;
+            padding: 2px;
+            border-radius: 3px;
+        }
+
+        button {
+            background: #292929;
+            color: #ddd;
+            border: 1px solid #444;
+            padding: 8px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #333;
+        }
+
+        button.active {
+            background: #444;
+            border-color: #aaa;
+        }
+
+        button.primary {
+            width: 100%;
+            background: #345b3a;
+            border-color: #527f58;
+            color: white;
+            padding: 11px;
+            margin-top: 5px;
+        }
+
+        button.primary:hover {
+            background: #3e6d45;
+        }
+
+        button.danger {
+            color: #ff8888;
+        }
+
+        .tool-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .row > * {
+            flex: 1;
+        }
+
+        .material {
+            display: grid;
+            grid-template-columns: 28px 1fr auto;
+            gap: 7px;
+            align-items: center;
+            padding: 7px;
+            margin-bottom: 5px;
+            background: #222;
+            border: 1px solid #333;
+            cursor: pointer;
+        }
+
+        .material.selected {
+            border-color: #aaa;
+            background: #2b2b2b;
+        }
+
+        .material-color {
+            width: 18px;
+            height: 18px;
+            border-radius: 2px;
+            border: 1px solid #666;
+        }
+
+        .material-name {
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+
+        .material-index {
+            color: #777;
+        }
+
+        .small {
+            color: #777;
+            font-size: 12px;
+        }
+
+        .status {
+            margin-top: 10px;
+            color: #777;
+            line-height: 1.5;
+        }
+
+        #material-editor {
+            display: none;
+        }
+
+        #material-editor.visible {
+            display: block;
+        }
+
+        #canvas-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        #grid {
+            width: min(calc(100vh - 40px), calc(100vw - 340px), 800px);
+            height: min(calc(100vh - 40px), calc(100vw - 340px), 800px);
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            cursor: crosshair;
+            background: #000;
+            border: 1px solid #555;
+        }
+
+        .scale-info {
+            margin-top: 8px;
+            color: #888;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="sidebar">
+
+    <h1>Heat Scene Editor</h1>
+
+    <div class="section">
+        <h2>Tool</h2>
+
+        <div class="tool-buttons">
+            <button id="temperatureTool" class="active" type="button">Temperature</button>
+            <button id="materialTool" type="button">Material</button>
+        </div>
+
+        <br>
+
+        <label for="brushSize">Brush Size: <span id="brushSizeValue">3</span></label>
+        <input id="brushSize" type="range" min="1" max="25" value="3">
+
+        <br><br>
+
+        <button id="clearButton" class="danger" type="button">Clear Scene</button>
+    </div>
+
+    <div class="section">
+        <h2>Temperature</h2>
+
+        <label for="temperature">Paint Temperature (°C)</label>
+        <input id="temperature" type="number" value="22" step="0.1">
+
+        <br><br>
+
+        <div class="row">
+            <button id="temperatureDecrease" type="button">−</button>
+            <button id="temperatureIncrease" type="button">+</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Materials</h2>
+
+        <div id="materials"></div>
+
+        <button id="addMaterial" type="button">+ Add Material</button>
+
+        <div id="material-editor">
+
+            <h2>Selected Material</h2>
+
+            <label for="materialName">Name</label>
+            <input id="materialName" type="text">
+
+            <br>
+
+            <label for="conductivity">Conductivity (W/m·K)</label>
+            <input id="conductivity" type="number" min="0" step="0.001">
+
+            <br>
+
+            <label for="density">Density (kg/m³)</label>
+            <input id="density" type="number" min="0" step="0.001">
+
+            <br>
+
+            <label for="specificHeat">Specific Heat (J/kg·K)</label>
+            <input id="specificHeat" type="number" min="0" step="0.001">
+
+            <br>
+
+            <label for="materialColor">Editor Color</label>
+            <input id="materialColor" type="color" value="#888888">
+
+            <br><br>
+
+            <button id="deleteMaterial" class="danger" type="button">Delete Material</button>
+
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Scene</h2>
+
+        <button id="downloadButton" class="primary" type="button">Download scene.csv</button>
+
+        <div class="status">
+            Grid: 100 × 100<br>
+            Voxels: <span id="voxelCount">10,000</span><br>
+            CSV: temp, conductivity, density, specific_heat
+        </div>
+    </div>
+
+</div>
+
+<div id="canvas-container">
+    <canvas id="grid" width="100" height="100"></canvas>
+</div>
+
+<script>
+"use strict";
+
+
+//Constants
+
+const ROWS = 100;
+const COLS = 100;
+
+
+//DOM
+
+const canvas = document.getElementById("grid");
+const ctx = canvas.getContext("2d", { alpha: false });
+const temperatureInput = document.getElementById("temperature");
+const brushSizeInput = document.getElementById("brushSize");
+const brushSizeValue = document.getElementById("brushSizeValue");
+const temperatureToolButton = document.getElementById("temperatureTool");
+const materialToolButton = document.getElementById("materialTool");
+const materialsContainer = document.getElementById("materials");
+const materialEditor = document.getElementById("material-editor");
+const materialNameInput = document.getElementById("materialName");
+const conductivityInput = document.getElementById("conductivity");
+const densityInput = document.getElementById("density");
+const specificHeatInput = document.getElementById("specificHeat");
+const materialColorInput = document.getElementById("materialColor");
+
+
+//State
+
+let currentTool = "temperature";
+let selectedMaterial = 0;
+let mouseDown = false;
+
+//voxels hold temp and material index
+const grid = Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => ({ temperature: 22.0, material: 0 })));
+
+
+//Materials
+
+let materials = [
+    {
+        name: "Air",
+        conductivity: 0.025,
+        density: 1.225,
+        specificHeat: 1005,
+        color: "#87bbff"
+    },
+    {
+        name: "Aluminum",
+        conductivity: 205.0,
+        density: 2700.0,
+        specificHeat: 897.0,
+        color: "#cccccc"
+    },
+    {
+        name: "Steel",
+        conductivity: 80.0,
+        density: 7874.0,
+        specificHeat: 460.0,
+        color: "#777777"
+    },
+    {
+        name: "Copper",
+        conductivity: 401.0,
+        density: 8960.0,
+        specificHeat: 385.0,
+        color: "#b87333"
+    },
+    {
+        name: "Wood",
+        conductivity: 0.15,
+        density: 600.0,
+        specificHeat: 1700.0,
+        color: "#8b5a2b"
+    },
+    {
+        name: "PLA Plastic",
+        conductivity: 0.13,
+        density: 1240.0,
+        specificHeat: 1800.0,
+        color: "#e0e0e0"
+    }
+];
+
+//{
+//    name: "Stone",
+//    conductivity: 2.0,
+//    density: 2600.0,
+//    specificHeat: 790.0,
+//    color: "#888888"
+//},
+
+
+//Temperature colors
+
+//same gradient as c++ sim
+const colorStops = [
+    [0, 0, 55],
+    [0, 255, 255],
+    [0, 255, 0],
+    [255, 255, 0],
+    [255, 50, 50]
+];
+
+//min and max temp in scene
+function getTemperatureRange() {
+    let minTemp = Infinity;
+    let maxTemp = -Infinity;
+
+    for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+            const temperature = grid[y][x].temperature;
+
+            if (temperature < minTemp) {
+                minTemp = temperature;
+            }
+
+            if (temperature > maxTemp) {
+                maxTemp = temperature;
+            }
+        }
+    }
+
+    return { min: minTemp, max: maxTemp };
+}
+
+//scales to current min/max instead of fixed range
+function temperatureToColor(temperature, minTemp, maxTemp) {
+    //no gradient if all the same, use middle color
+    if (maxTemp === minTemp) {
+        return "rgb(0, 255, 0)";
+    }
+
+    let t = (temperature - minTemp) / (maxTemp - minTemp);
+    t = Math.max(0, Math.min(1, t));
+
+    const segmentCount = colorStops.length - 1;
+    const scaled = t * segmentCount;
+    let segment = Math.floor(scaled);
+
+    if (segment >= segmentCount) {
+        segment = segmentCount - 1;
+    }
+
+    const localT = scaled - segment;
+    const c0 = colorStops[segment];
+    const c1 = colorStops[segment + 1];
+    const r = Math.round(c0[0] + localT * (c1[0] - c0[0]));
+    const g = Math.round(c0[1] + localT * (c1[1] - c0[1]));
+    const b = Math.round(c0[2] + localT * (c1[2] - c0[2]));
+
+    return `rgb(${r}, ${g}, ${b})`;
+}
+
+
+//Color helpers
+
+function hexToRgb(hex) {
+    hex = hex.replace("#", "");
+
+    return {
+        r: parseInt(hex.substring(0, 2), 16),
+        g: parseInt(hex.substring(2, 4), 16),
+        b: parseInt(hex.substring(4, 6), 16)
+    };
+}
+
+//rgb(...) string back to hex
+function rgbStringToHex(rgb) {
+    const values = rgb.match(/\d+/g);
+
+    if (!values || values.length < 3) {
+        return "#00ff00";
+    }
+
+    const r = Number(values[0]).toString(16).padStart(2, "0");
+    const g = Number(values[1]).toString(16).padStart(2, "0");
+    const b = Number(values[2]).toString(16).padStart(2, "0");
+
+    return `#${r}${g}${b}`;
+}
+
+
+//Rendering
+
+function drawGrid() {
+    const image = ctx.createImageData(COLS, ROWS);
+
+    //only need range in temp view
+    let temperatureRange = null;
+
+    if (currentTool === "temperature") {
+        temperatureRange = getTemperatureRange();
+    }
+
+    for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+            const voxel = grid[y][x];
+            let rgb;
+
+            if (currentTool === "temperature") {
+                const color = temperatureToColor(voxel.temperature, temperatureRange.min, temperatureRange.max);
+                rgb = hexToRgb(rgbStringToHex(color));
+            } else {
+                const material = materials[voxel.material];
+                rgb = hexToRgb(material.color);
+            }
+
+            const index = (y * COLS + x) * 4;
+
+            image.data[index] = rgb.r;
+            image.data[index + 1] = rgb.g;
+            image.data[index + 2] = rgb.b;
+            image.data[index + 3] = 255;
+        }
+    }
+
+    ctx.putImageData(image, 0, 0);
+}
+
+
+//Painting
+
+function getGridPosition(event) {
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((event.clientX - rect.left) / rect.width * COLS);
+    const y = Math.floor((event.clientY - rect.top) / rect.height * ROWS);
+
+    return {
+        x: Math.max(0, Math.min(COLS - 1, x)),
+        y: Math.max(0, Math.min(ROWS - 1, y))
+    };
+}
+
+function paint(x, y) {
+    const brushSize = Number(brushSizeInput.value);
+    const radius = Math.floor(brushSize / 2);
+
+    //temperature painting
+    if (currentTool === "temperature") {
+        const temperature = Number(temperatureInput.value);
+
+        if (!Number.isFinite(temperature)) {
+            return;
+        }
+
+        for (let dy = -radius; dy <= radius; dy++) {
+            for (let dx = -radius; dx <= radius; dx++) {
+                if (dx * dx + dy * dy > radius * radius) {
+                    continue;
+                }
+
+                const px = x + dx;
+                const py = y + dy;
+
+                if (px < 0 || px >= COLS || py < 0 || py >= ROWS) {
+                    continue;
+                }
+
+                grid[py][px].temperature = temperature;
+            }
+        }
+    }
+
+    //material painting
+    else {
+        for (let dy = -radius; dy <= radius; dy++) {
+            for (let dx = -radius; dx <= radius; dx++) {
+                if (dx * dx + dy * dy > radius * radius) {
+                    continue;
+                }
+
+                const px = x + dx;
+                const py = y + dy;
+
+                if (px < 0 || px >= COLS || py < 0 || py >= ROWS) {
+                    continue;
+                }
+
+                grid[py][px].material = selectedMaterial;
+            }
+        }
+    }
+
+    drawGrid();
+}
+
+
+//Mouse
+
+canvas.addEventListener("mousedown", event => {
+    if (event.button !== 0) {
+        return;
+    }
+
+    mouseDown = true;
+
+    const position = getGridPosition(event);
+    paint(position.x, position.y);
+});
+
+canvas.addEventListener("mousemove", event => {
+    if (!mouseDown) {
+        return;
+    }
+
+    const position = getGridPosition(event);
+    paint(position.x, position.y);
+});
+
+window.addEventListener("mouseup", () => {
+    mouseDown = false;
+});
+
+
+//Tools
+
+function setTool(tool) {
+    currentTool = tool;
+
+    temperatureToolButton.classList.toggle("active", tool === "temperature");
+    materialToolButton.classList.toggle("active", tool === "material");
+
+    //tool decides what the grid shows
+    drawGrid();
+}
+
+temperatureToolButton.addEventListener("click", () => {
+    setTool("temperature");
+});
+
+materialToolButton.addEventListener("click", () => {
+    setTool("material");
+});
+
+
+//Brush size
+
+brushSizeInput.addEventListener("input", () => {
+    brushSizeValue.textContent = brushSizeInput.value;
+});
+
+
+//Temperature controls
+
+document.getElementById("temperatureDecrease").addEventListener("click", () => {
+    let value = Number(temperatureInput.value);
+
+    if (!Number.isFinite(value)) {
+        value = 22;
+    }
+
+    temperatureInput.value = (value - 1).toFixed(1);
+});
+
+document.getElementById("temperatureIncrease").addEventListener("click", () => {
+    let value = Number(temperatureInput.value);
+
+    if (!Number.isFinite(value)) {
+        value = 22;
+    }
+
+    temperatureInput.value = (value + 1).toFixed(1);
+});
+
+
+//Material UI
+
+function renderMaterials() {
+    materialsContainer.innerHTML = "";
+
+    materials.forEach((material, index) => {
+        const element = document.createElement("div");
+        element.className = "material";
+
+        if (index === selectedMaterial) {
+            element.classList.add("selected");
+        }
+
+        element.innerHTML = `
+            <div class="material-color" style="background:${escapeHtml(material.color)}"></div>
+            <div class="material-name">${escapeHtml(material.name)}</div>
+            <div class="material-index">${index}</div>
+        `;
+
+        element.addEventListener("click", () => {
+            selectedMaterial = index;
+            loadMaterialEditor();
+            renderMaterials();
+
+            //also switch to material view
+            setTool("material");
+        });
+
+        materialsContainer.appendChild(element);
+    });
+}
+
+function loadMaterialEditor() {
+    const material = materials[selectedMaterial];
+
+    if (!material) {
+        materialEditor.classList.remove("visible");
+        return;
+    }
+
+    materialEditor.classList.add("visible");
+
+    materialNameInput.value = material.name;
+    conductivityInput.value = material.conductivity;
+    densityInput.value = material.density;
+    specificHeatInput.value = material.specificHeat;
+    materialColorInput.value = material.color;
+}
+
+function updateSelectedMaterial() {
+    const material = materials[selectedMaterial];
+
+    if (!material) {
+        return;
+    }
+
+    const conductivity = Number(conductivityInput.value);
+    const density = Number(densityInput.value);
+    const specificHeat = Number(specificHeatInput.value);
+
+    if (!Number.isFinite(conductivity) || !Number.isFinite(density) || !Number.isFinite(specificHeat) || conductivity < 0 || density < 0 || specificHeat < 0) {
+        return;
+    }
+
+    material.name = materialNameInput.value.trim() || "Material";
+    material.conductivity = conductivity;
+    material.density = density;
+    material.specificHeat = specificHeat;
+    material.color = materialColorInput.value;
+
+    renderMaterials();
+    drawGrid();
+}
+
+materialNameInput.addEventListener("input", updateSelectedMaterial);
+conductivityInput.addEventListener("input", updateSelectedMaterial);
+densityInput.addEventListener("input", updateSelectedMaterial);
+specificHeatInput.addEventListener("input", updateSelectedMaterial);
+materialColorInput.addEventListener("input", updateSelectedMaterial);
+
+
+//Add material
+
+document.getElementById("addMaterial").addEventListener("click", () => {
+    materials.push({
+        name: `Material ${materials.length}`,
+        conductivity: 1.0,
+        density: 1000.0,
+        specificHeat: 1000.0,
+        color: "#888888"
+    });
+
+    selectedMaterial = materials.length - 1;
+
+    renderMaterials();
+    loadMaterialEditor();
+    setTool("material");
+});
+
+
+//Delete material
+
+document.getElementById("deleteMaterial").addEventListener("click", () => {
+    if (materials.length <= 1) {
+        alert("At least one material is required.");
+        return;
+    }
+
+    const materialToDelete = selectedMaterial;
+
+    //voxels using deleted material go to 0
+    for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+            const materialIndex = grid[y][x].material;
+
+            if (materialIndex === materialToDelete) {
+                grid[y][x].material = 0;
+            } else if (materialIndex > materialToDelete) {
+                grid[y][x].material--;
+            }
+        }
+    }
+
+    materials.splice(materialToDelete, 1);
+
+    selectedMaterial = Math.min(selectedMaterial, materials.length - 1);
+
+    renderMaterials();
+    loadMaterialEditor();
+    drawGrid();
+});
+
+
+//Clear scene
+
+document.getElementById("clearButton").addEventListener("click", () => {
+    const confirmed = confirm("Clear the entire scene and reset all voxels to 22°C?");
+
+    if (!confirmed) {
+        return;
+    }
+
+    for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+            grid[y][x].temperature = 22.0;
+            grid[y][x].material = 0;
+        }
+    }
+
+    drawGrid();
+});
+
+
+//CSV
+
+function csvEscape(value) {
+    const string = String(value);
+
+    if (string.includes(",") || string.includes('"') || string.includes("\n")) {
+        return `"${string.replaceAll('"', '""')}"`;
+    }
+
+    return string;
+}
+
+function createCSV() {
+    const lines = [];
+
+    //header matches c++ loader
+    lines.push("temp,conductivity,density,specific_heat");
+
+    //row major order like the loader
+    for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+            const voxel = grid[y][x];
+            const material = materials[voxel.material];
+
+            lines.push([voxel.temperature, material.conductivity, material.density, material.specificHeat].map(csvEscape).join(","));
+        }
+    }
+
+    return lines.join("\r\n") + "\r\n";
+}
+
+
+//Download
+
+document.getElementById("downloadButton").addEventListener("click", () => {
+    const csv = createCSV();
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = "scene.csv";
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    URL.revokeObjectURL(url);
+});
+
+
+//HTML escaping
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+
+//Init
+
+renderMaterials();
+loadMaterialEditor();
+drawGrid();
+
+</script>
+
+</body>
+</html>
